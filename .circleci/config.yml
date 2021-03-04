@@ -45,7 +45,7 @@ jobs:
           command: |
             # Your code here
             cd frontend
-            npm i
+            yarn install
             npm run build
       - save_cache:
           paths: [frontend/node_modules]
