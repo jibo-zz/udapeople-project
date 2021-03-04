@@ -79,7 +79,6 @@ jobs:
           name: Test front-end
           command: |
             cd frontend
-            yarn install
             npm run test
           environment:
             NODE_OPTIONS: --max_old_space_size=8192
@@ -109,6 +108,8 @@ jobs:
           command: |
             cd frontend
             npm audit --audit-level=critical
+          environment:
+            NODE_OPTIONS: --max_old_space_size=8192
 
   scan-backend:
     docker:
