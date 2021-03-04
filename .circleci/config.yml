@@ -4,6 +4,15 @@ orbs:
   slack: circleci/slack@4.3.0
 
 commands:
+  extract-commit-message:
+    description: Extract commit message
+    steps:
+      - run:
+          name: Extract commit message
+          when: always
+          command: |
+            echo "export COMMIT_MESSAGE=\"$(git log --format=%B -n 1 $CIRCLE_SHA1)\"" >> $BASH_ENV
+            source $BASH_ENV
 #   destroy-environment:
 #     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
 #     parameters:
@@ -85,10 +94,22 @@ jobs:
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
+      - extract-commit-message
       - slack/notify:
           channel: C01Q5AANY69
           event: fail
-          template: basic_fail_1
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                      "type": "mrkdwn",
+                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
+                  }
+                }
+              ]
+            }
 
   test-frontend:
     docker:
