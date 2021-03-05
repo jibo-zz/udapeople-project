@@ -13,17 +13,23 @@ commands:
           command: |
             echo "export COMMIT_MESSAGE=\"$(git log --format=%B -n 1 $CIRCLE_SHA1)\"" >> $BASH_ENV
             source $BASH_ENV
-#   destroy-environment:
-#     description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
-#     parameters:
-#       # Add parameter here
-#     steps:
-#       - run:
-#           name: Destroy environments
-#           when: on_fail
-#           command: |
-#             # Your code here
-#             exit 1
+
+  destroy-environment:
+    description: Destroy backend and frontend cloudformation stacks given a workflow ID.
+    steps:
+      - run:
+          name: Delete S3 content
+          when: on_fail
+          command: |
+            aws s3 rm s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+            exit 0
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            aws cloudformation delete-stack --stack-name backend-${CIRCLE_WORKFLOW_ID:0:7}
+            aws cloudformation delete-stack --stack-name frontend-${CIRCLE_WORKFLOW_ID:0:7}
+            exit 0
 
   # revert-migrations:
   #   description: Revert the last migration if successfully run in the current workflow.
@@ -168,39 +174,68 @@ jobs:
             cd backend
             npm audit fix --audit-level=critical
 
-  # deploy-infrastructure:
-  #   docker:
-  #   # Docker image here that supports AWS CLI
-  #   steps:
-  #     # Checkout code from git
-  #     - run:
-  #         name: Ensure back-end infrastructure exists
-  #         command: |
-  #           aws cloudformation deploy \
-  #             --template-file .circleci/files/backend.yml \
-  #             #--tags project=your-tag \
-  #             # --stack-name "your back-end stack name with workflow id" \
-  #             # --parameter-overrides ID="your workflow id"  
-  #             exit 1
-  #     - run:
-  #         name: Ensure front-end infrastructure exist
-  #         command: |
-  #           aws cloudformation deploy \
-  #             --template-file .circleci/files/frontend.yml \
-  #             #--tags project=your-tag \
-  #             # --stack-name "your front-end stack name with workflow id" \
-  #             # --parameter-overrides ID="your workflow id"  
-  #             exit 1
-  #     - run:
-  #         name: Add back-end ip to ansible inventory
-  #         command: |
-  #           # Your code here
-  #           exit 1
-  #     - persist_to_workspace:
-  #         root: ~/
-  #         paths:
-  #           - project/.circleci/ansible/inventory.txt
-  #     # Here's where you will add some code to rollback on failure
+  deploy-infrastructure:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run: yum -y install tar gzip
+      - run:
+          name: Ensure back-end infrastructure exists
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/backend.yml \
+              --tags project=udapeople  \
+              --stack-name "backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
+
+      - run:
+          name: Ensure front-end infrastructure exist
+          command: |
+            aws cloudformation deploy \
+            --template-file .circleci/files/frontend.yml \
+            --tags project=udapeople \
+            --stack-name "frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
+            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
+
+      - run:
+          name: Add back-end ip to ansible inventory
+          command: |
+            BACKEND_IP=`aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --query "Reservations[*].Instances[*].[PublicDnsName]" \
+              --output text | tr -d '\n'`
+            echo $BACKEND_IP >> .circleci/ansible/inventory.txt
+            cat .circleci/ansible/inventory.txt
+            # put it in the shared memory
+            curl -H "Content-Type: text/plain" \
+              -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
+              --request PUT \
+              --data "$BACKEND_IP" https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}
+
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/.circleci/ansible/inventory.txt
+      # Here's where you will add some code to rollback on failure
+      - extract-commit-message
+      - slack/notify:
+          channel: C01Q5AANY69
+          event: fail
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                      "type": "mrkdwn",
+                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
+                  }
+                }
+              ]
+            }
+            
+      - destroy-environment
 
   # configure-infrastructure:
   #   docker:
@@ -346,11 +381,11 @@ workflows:
           requires: [build-backend]
       - scan-frontend:
           requires: [build-frontend]
-      # - deploy-infrastructure:
-      #     requires: [test-frontend, test-backend, scan-frontend, scan-backend]
-      #     filters:
-      #       branches:
-      #         only: [test-feature-branch]
+      - deploy-infrastructure:
+          requires: [test-frontend, test-backend, scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [test-feature-branch]
       # - configure-infrastructure:
       #     requires: [deploy-infrastructure]
       # - run-migrations:
