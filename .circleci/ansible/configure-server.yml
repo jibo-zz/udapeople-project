@@ -1,6 +1,5 @@
 ---
-
-- name: "configuration play." 
+- name: "configuration play."
   hosts: web
   user: ubuntu
   gather_facts: false
@@ -14,8 +13,8 @@
       wait_for_connection:
         timeout: 60
 
-    - name: "install python for Ansible."
-      # Your code here
+    # - name: "install python for Ansible."
+    #   # Your code here
 
   roles:
     - configure-server
