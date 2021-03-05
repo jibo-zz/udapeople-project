@@ -219,22 +219,6 @@ jobs:
           paths:
             - project/.circleci/ansible/inventory.txt
       # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
 
       - destroy-environment
 
@@ -265,28 +249,12 @@ jobs:
             cd ~/project/.circleci/ansible
             ansible-playbook configure-server.yml --inventory-file=inventory.txt
 
-      - run:
-          name: Install prometheus node exporter
-          command: |
-            cd ~/project/.circleci/ansible
-            ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
+      # - run:
+      #     name: Install prometheus node exporter
+      #     command: |
+      #       cd ~/project/.circleci/ansible
+      #       ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
       # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
 
       - destroy-environment
 
@@ -320,22 +288,6 @@ jobs:
                --request PUT --data "1" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
             fi
       # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
 
       - revert-migrations
       - destroy-environment
@@ -384,23 +336,6 @@ jobs:
             --request PUT --data "$S3_URL" \
             https://api.memstash.io/values/S3_URL_${CIRCLE_WORKFLOW_ID:0:7}
       # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
-
       - revert-migrations
       - destroy-environment
 
@@ -441,22 +376,6 @@ jobs:
             cd ~/project/.circleci/ansible
             ansible-playbook deploy-backend.yml --inventory-file=inventory.txt
       # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
 
       - revert-migrations
       - destroy-environment
