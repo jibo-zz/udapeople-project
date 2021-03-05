@@ -1,0 +1,2 @@
+- name: BECFG100 udapeople prerequisites
+  include_tasks: BECFG100_prerequsites.yml
