@@ -184,11 +184,10 @@ jobs:
           name: Install dependencies
           command: yum install -y tar gzip
       - run:
-          name: Deploy backend infrastructure
-          working_directory: ./.circleci/files
+          name: Ensure backend infrastructure exists
           command: |
             aws cloudformation deploy \
-              --template-file backend.yaml \
+              --template-file .circleci/files/backend.yaml \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --tags project=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
@@ -201,23 +200,21 @@ jobs:
               --output text)
             curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "http://$BACKEND_IP:3030" https://api.memstash.io/values/BACKEND_URL
       - run:
-          name: Deploy frontend infrastructure
-          working_directory: ./.circleci/files
+          name: Ensure frontend infrastructure exist
           command: |
             aws cloudformation deploy \
-              --template-file frontend.yaml \
+              --template-file .circleci/files/frontend.yaml \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
       - run:
           name: Add backend ip to ansible inventory
-          working_directory: ./.circleci/ansible
           command: |
             aws ec2 describe-instances \
               --query 'Reservations[*].Instances[*].PublicIpAddress' \
               --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --output text >> inventory
-            cat inventory
+              --output text >> .circleci/ansible/inventory
+            cat .circleci/ansible/inventory
       - persist_to_workspace:
           root: .
           paths:
@@ -237,14 +234,14 @@ jobs:
           at: .
       - run:
           name: Install dependencies
-          working_directory: ./.circleci/ansible
           command: |
+            cd .circleci/ansible
             apk add --update ansible
             ansible --version
       - run:
           name: Configure server
-          working_directory: ./.circleci/ansible
           command: |
+            cd .circleci/ansible
             pwd &&
             ls -la
             cat inventory
@@ -266,16 +263,16 @@ jobs:
           at: .
       - run:
           name: Install AWS CLI dependencies
-          working_directory: /tmp
           command: |
+            cd /tmp
             sudo apt-get update && sudo apt-get install -yy less
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
             sudo ./aws/install
       - run:
           name: Run migrations
-          working_directory: ./backend
           command: |
+            cd backend
             npm run migrations > migration_status
       - run:
           name: Send migration results to memstash
@@ -303,23 +300,26 @@ jobs:
           at: .
       - run:
           name: Install AWS CLI dependencies
-          working_directory: /tmp
           command: |
+            cd /tmp
             sudo apt-get update && sudo apt-get install -yy less
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
             sudo ./aws/install
       - run:
-          name: Rebuild frontend with backend API Url
-          working_directory: ./frontend
+          name: Get backend url
           command: |
             export API_URL=$(curl -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request GET https://api.memstash.io/values/BACKEND_URL)
             echo "${API_URL}"
+      - run:
+          name: Build frontend
+          command: |
+            cd frontend
             npm run build
       - run:
-          name: Deploy frontend objects to S3
-          working_directory: ./frontend
+          name: Deploy frontend objects
           command: |
+            cd frontend
             aws s3 cp ./dist "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
       - persist_to_workspace:
           root: .
@@ -341,18 +341,17 @@ jobs:
           at: .
       - run:
           name: Install dependencies
-          working_directory: /tmp
           command: |
+            cd /tmp
             apk add --update ansible curl rsync openssh nodejs npm
             ansible --version
             pip install awscli
             aws --version
       - run:
           name: Deploy backend
-          working_directory: ./.circleci/ansible
           command: |
-            cat inventory
-            ansible-playbook -i inventory deploy-server.yaml -vv
+            cat .circleci/ansible/inventory
+            ansible-playbook -i .circleci/ansible/inventory .circleci/ansible/deploy-server.yaml -vv
       # Here's where you will add some code to rollback on failure
       - revert-migrations
       - destroy-environment
@@ -366,19 +365,17 @@ jobs:
           at: .
       - run:
           name: Install dependencies
-          working_directory: /tmp
           command: |
+            cd /tmp
             apk add --update curl nodejs npm
             pip install awscli
       - run:
           name: Backend smoke test.
-          working_directory: ./backend
           command: |
             export BACKEND_URL=$(curl -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request GET https://api.memstash.io/values/BACKEND_URL)
             curl "$BACKEND_URL/api/status"
       - run:
           name: Frontend smoke test.
-          working_directory: ./backend
           command: |
             URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.eu-central-1.amazonaws.com/index.html"
             curl -s ${URL} | grep -q "Welcome"
