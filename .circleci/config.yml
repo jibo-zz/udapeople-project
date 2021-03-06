@@ -203,7 +203,7 @@ jobs:
           name: Ensure frontend infrastructure exist
           command: |
             aws cloudformation deploy \
-              --template-file .circleci/files/frontend.yaml \
+              --template-file .circleci/files/frontend.yml \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
               --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
@@ -245,7 +245,7 @@ jobs:
             pwd &&
             ls -la
             cat inventory
-            ansible-playbook -i inventory configure-server.yaml
+            ansible-playbook -i inventory configure-server.yml
       # - run:
       #     name: Install prometheus node exporter
       #     command: |
@@ -351,7 +351,7 @@ jobs:
           name: Deploy backend
           command: |
             cat .circleci/ansible/inventory
-            ansible-playbook -i .circleci/ansible/inventory .circleci/ansible/deploy-server.yaml -vv
+            ansible-playbook -i .circleci/ansible/inventory .circleci/ansible/deploy-server.yml -vv
       # Here's where you will add some code to rollback on failure
       - revert-migrations
       - destroy-environment
