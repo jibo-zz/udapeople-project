@@ -180,229 +180,208 @@ jobs:
       - image: amazon/aws-cli
     steps:
       - checkout
-      - run: yum -y install tar gzip
       - run:
-          name: Ensure back-end infrastructure exists
+          name: Install dependencies
+          command: yum install -y tar gzip
+      - run:
+          name: Deploy backend infrastructure
+          working_directory: ./.circleci/files
           command: |
             aws cloudformation deploy \
-              --template-file .circleci/files/backend.yml \
-              --tags project=udapeople  \
-              --stack-name "backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
-
+              --template-file backend.yaml \
+              --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
+              --tags project=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       - run:
-          name: Ensure front-end infrastructure exist
+          name: Save backend URL in memstash
+          command: |
+            BACKEND_IP=$(aws ec2 describe-instances \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --output text)
+            curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "http://$BACKEND_IP:3030" https://api.memstash.io/values/BACKEND_URL
+      - run:
+          name: Deploy frontend infrastructure
+          working_directory: ./.circleci/files
           command: |
             aws cloudformation deploy \
-            --template-file .circleci/files/frontend.yml \
-            --tags project=udapeople \
-            --stack-name "frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
-
+              --template-file frontend.yaml \
+              --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
+              --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
       - run:
-          name: Add back-end ip to ansible inventory
+          name: Add backend ip to ansible inventory
+          working_directory: ./.circleci/ansible
           command: |
-            BACKEND_IP=`aws ec2 describe-instances \
-              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --query "Reservations[*].Instances[*].[PublicDnsName]" \
-              --output text | tr -d '\n'`
-            echo $BACKEND_IP >> .circleci/ansible/inventory.txt
-            cat .circleci/ansible/inventory.txt
-            # put it in the shared memory
-            curl -H "Content-Type: text/plain" \
-              -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
-              --request PUT \
-              --data "$BACKEND_IP" https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}
-
+            aws ec2 describe-instances \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --output text >> inventory
+            cat inventory
       - persist_to_workspace:
-          root: ~/
+          root: .
           paths:
-            - project/.circleci/ansible/inventory.txt
+            - .circleci/ansible/inventory
       # Here's where you will add some code to rollback on failure
-
       - destroy-environment
 
   configure-infrastructure:
     docker:
-      - image: willhallonline/ansible:2.10-ubuntu-20.04
+      - image: python:3.9.0-alpine
     steps:
       - checkout
       - add_ssh_keys:
           fingerprints:
             - "9f:aa:d6:13:fa:8d:1c:a9:98:79:56:08:92:ab:60:03"
       - attach_workspace:
-          at: ~/
+          at: .
       - run:
           name: Install dependencies
+          working_directory: ./.circleci/ansible
           command: |
-            apt -y update
-            apt -y install jq tar gzip git curl
-      
-      - run:
-          name: Avoid hosts unknown
-          command: |
-            echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
-
+            apk add --update ansible
+            ansible --version
       - run:
           name: Configure server
+          working_directory: ./.circleci/ansible
           command: |
-            cd ~/project/.circleci/ansible
-            ansible-playbook configure-server.yml --inventory-file=inventory.txt
-
+            pwd &&
+            ls -la
+            cat inventory
+            ansible-playbook -i inventory configure-server.yaml
       # - run:
       #     name: Install prometheus node exporter
       #     command: |
       #       cd ~/project/.circleci/ansible
       #       ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
       # Here's where you will add some code to rollback on failure
-
       - destroy-environment
 
   run-migrations:
     docker:
-      - image: amazon/aws-cli
+      - image: circleci/node:14.16.0
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
-          name: Install dependencies
+          name: Install AWS CLI dependencies
+          working_directory: /tmp
           command: |
-            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
-            yum -y install nodejs npm tar gzip jq git
-
+            sudo apt-get update && sudo apt-get install -yy less
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
       - run:
           name: Run migrations
+          working_directory: ./backend
           command: |
-            cd backend
-            npm i
-            npm run migrations > /tmp/migration.log
-
+            npm run migrations > migration_status
       - run:
           name: Send migration results to memstash
+          working_directory: ./backend
           command: |
-            MIGRATION_COUNT=`grep -c "has been executed successfully" /tmp/migration.log || true`
-            echo "migrations count: ${MIGRATION_COUNT}"
-            if [[ $MIGRATION_COUNT -gt 0 ]];
+            if grep -q "has been executed successfully" migration_status
             then
-              # put it in the shared memory
-              curl -H "Content-Type: text/plain" \
-               -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
-               --request PUT --data "1" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
+              echo "DB migration was successful, will update memstash..."
+              curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "success" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
+            else
+              echo "DB migration failed, please verify setup! Probably the database already exists. Verify setup!"
+              curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "failure" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
             fi
+            echo "WorkflowID=${CIRCLE_WORKFLOW_ID:0:7}"
       # Here's where you will add some code to rollback on failur
-
       - revert-migrations
       - destroy-environment
 
   deploy-frontend:
     docker:
-      - image: amazon/aws-cli
+      - image: circleci/node:14.16.0
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
-          name: Install dependencies
+          name: Install AWS CLI dependencies
+          working_directory: /tmp
           command: |
-            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
-            yum -y install nodejs npm tar gzip jq git
+            sudo apt-get update && sudo apt-get install -yy less
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
       - run:
-          name: Get backend url
+          name: Rebuild frontend with backend API Url
+          working_directory: ./frontend
           command: |
-            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3030"
+            export API_URL=$(curl -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request GET https://api.memstash.io/values/BACKEND_URL)
             echo "${API_URL}"
+            npm run build
       - run:
-          name: Build frontend
-          command: |            
-            cd frontend
-            npm i
-            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3030"
-            export NODE_ENV=production
-            npm run build:prod
-      - run:
-          name: Deploy frontend objects
+          name: Deploy frontend objects to S3
+          working_directory: ./frontend
           command: |
-            cd frontend
-            aws s3 cp ./dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
-      - run:
-          name: Create S3 bucket url
-          command: |
-            LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
-            S3_URL="udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
-            echo $S3_URL
-            curl -H "Content-Type: text/plain" -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
-            --request PUT --data "$S3_URL" \
-            https://api.memstash.io/values/S3_URL_${CIRCLE_WORKFLOW_ID:0:7}
+            aws s3 cp ./dist "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
+      - persist_to_workspace:
+          root: .
+          paths:
+            - frontend/dist
       # Here's where you will add some code to rollback on failure
       - revert-migrations
       - destroy-environment
 
   deploy-backend:
     docker:
-      - image: willhallonline/ansible:2.10-ubuntu-20.04
+      - image: python:3.9.0-alpine
     steps:
       - checkout
       - add_ssh_keys:
           fingerprints:
             - "9f:aa:d6:13:fa:8d:1c:a9:98:79:56:08:92:ab:60:03"
       - attach_workspace:
-          at: ~/
-      - run:
-          name: Avoid hosts unknown
-          command: |
-            echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+          at: .
       - run:
           name: Install dependencies
+          working_directory: /tmp
           command: |
-            apt -y update
-            apt -y install jq tar gzip git curl
-            curl -sL https://deb.nodesource.com/setup_14.x | bash -
-            apt -y install nodejs
-      - run:
-          name: Build backend
-          command: |
-            cd backend
-            npm i
-            #export NODE_ENV=production
-            npm run build
-            cp package* ./dist
-            cd dist
-            tar -czvf ../app.tar.gz ./*
+            apk add --update ansible curl rsync openssh nodejs npm
+            ansible --version
+            pip install awscli
+            aws --version
       - run:
           name: Deploy backend
+          working_directory: ./.circleci/ansible
           command: |
-            cd ~/project/.circleci/ansible
-            ansible-playbook deploy-backend.yml --inventory-file=inventory.txt
+            cat inventory
+            ansible-playbook -i inventory deploy-server.yaml -vv
       # Here's where you will add some code to rollback on failure
-
       - revert-migrations
       - destroy-environment
 
   smoke-test:
     docker:
-      - image: amazon/aws-cli
+      - image: python:3.9.0-alpine
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: Install dependencies
+          working_directory: /tmp
           command: |
-            yum -y install jq tar gzip git curl
-      - run:
-          name: Get backend url
-          command: |
-            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            echo $BACKEND_IP
+            apk add --update curl nodejs npm
+            pip install awscli
       - run:
           name: Backend smoke test.
+          working_directory: ./backend
           command: |
-            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            curl -s http://${BACKEND_IP}:3030/api/status | grep "\"status\":\"ok\""
+            export BACKEND_URL=$(curl -H "token: 1e288415-cfc8-4a0a-a23c-087eb7cd7678" --request GET https://api.memstash.io/values/BACKEND_URL)
+            curl "$BACKEND_URL/api/status"
       - run:
           name: Frontend smoke test.
+          working_directory: ./backend
           command: |
-            LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
-            S3_URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
-            echo $S3_URL
-            curl -s ${S3_URL} | grep "Welcome"
+            URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.eu-central-1.amazonaws.com/index.html"
+            curl -s ${URL} | grep -q "Welcome"
       # Here's where you will add some code to rollback on failure
       - extract-commit-message
       - slack/notify:
