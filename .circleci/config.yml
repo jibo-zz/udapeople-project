@@ -316,6 +316,7 @@ jobs:
           name: Build frontend
           command: |
             cd frontend
+            npm i
             npm run build
       - run:
           name: Deploy frontend objects
@@ -352,7 +353,7 @@ jobs:
           name: Deploy backend
           command: |
             cat .circleci/ansible/inventory
-            ansible-playbook -i .circleci/ansible/inventory .circleci/ansible/deploy-server.yml -vv
+            ansible-playbook -i .circleci/ansible/inventory .circleci/ansible/deploy-backend.yml -vv
       # Here's where you will add some code to rollback on failure
       - revert-migrations
       - destroy-environment
