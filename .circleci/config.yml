@@ -377,28 +377,51 @@ jobs:
       - revert-migrations
       - destroy-environment
 
-  # smoke-test:
-  #   docker:
-  #     # Lightweight Docker image
-  #   steps:
-  #     # Checkout code from git
-  #     - run:
-  #         name: Install dependencies
-  #         command: |
-  #           # your code here
-  #     - run:
-  #         name: Get backend url
-  #         command: |
-  #           # your code here
-  #     - run:
-  #         name: Backend smoke test.
-  #         command: |
-  #           # your code here
-  #     - run:
-  #         name: Frontend smoke test.
-  #         command: |
-  #           # your code here
-  #     # Here's where you will add some code to rollback on failure
+  smoke-test:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            yum -y install jq tar gzip git curl
+      - run:
+          name: Get backend url
+          command: |
+            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
+            echo $BACKEND_IP
+      - run:
+          name: Backend smoke test.
+          command: |
+            curl -s http://${BACKEND_IP}:3030/api/status | grep "\"status\":\"ok\""
+      - run:
+          name: Frontend smoke test.
+          command: |
+            LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
+            S3_URL="http://udapeopl-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
+            echo $S3_URL
+            curl -s ${S3_URL} | grep "Welcome"
+      # Here's where you will add some code to rollback on failure
+      - extract-commit-message
+      - slack/notify:
+          channel: C01Q5AANY69
+          event: fail
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                      "type": "mrkdwn",
+                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
+                  }
+                }
+              ]
+            }
+      - revert-migrations
+      - destroy-environment
+
 
   # cloudfront-update:
   #   docker:
