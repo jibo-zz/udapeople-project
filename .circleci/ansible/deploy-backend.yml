@@ -1,5 +1,5 @@
 ---
-  - name: Deploy and start udapeople backend server
+  - name: "configuration play"
     hosts: all
     user: ubuntu
     gather_facts: false
