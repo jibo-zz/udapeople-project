@@ -2,7 +2,7 @@
 - name: "01 update"
   become: true
   shell: |
-  apt-get -y update
+    apt-get -y update
 - name: "02 install python3.6"
   become: true
   shell: |
