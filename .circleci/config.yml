@@ -221,28 +221,29 @@ jobs:
 
   configure-infrastructure:
     docker:
-      - image: python:3.9.0-alpine
+      - image: willhallonline/ansible:2.10-ubuntu-18.04
     steps:
       - checkout
       - add_ssh_keys:
           fingerprints:
             - "9f:aa:d6:13:fa:8d:1c:a9:98:79:56:08:92:ab:60:03"
-      - attach_workspace:
-          at: .
       - run:
           name: Install dependencies
           command: |
-            cd .circleci/ansible
-            apk add --update ansible
-            ansible --version
+            apt -y update
+            apt -y install jq tar gzip git curl
+      - attach_workspace:
+          at: ~/
+
+      - run:
+          name: Avoid hosts unknown
+          command: |
+            echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
       - run:
           name: Configure server
           command: |
-            cd .circleci/ansible
-            pwd &&
-            ls -la
-            cat inventory.txt
-            ansible-playbook -i inventory.txt configure-server.yml
+            cd ~/project/.circleci/ansible
+            ansible-playbook configure-server.yml --inventory-file=inventory.txt
       # - run:
       #     name: Install prometheus node exporter
       #     command: |
