@@ -1,33 +1,33 @@
 ---
-  - name: "01 show  make directory"
-    become_user: ubuntu
-    shell: mkdir -p ~/udapeople/
+- name: "01 show  make directory"
+  become_user: ubuntu
+  shell: mkdir -p ~/udapeople/
 
-  - name: "02 stop previous execution"
-    become_user: ubuntu
-    shell: |
-      cd ~/udapeople/    
-      if pm2 monitor main.js | grep "online"; then
-        pm2 stop main.js
-      fi
-  - name: "03 remove previous deployment"
-    become: true
-    file: 
-      path: ~/udapeople/ 
-      state: absent
+- name: "02 stop previous execution"
+  become_user: ubuntu
+  shell: |
+    cd ~/udapeople/    
+    if pm2 monitor main.js | grep "online"; then
+      pm2 stop main.js
+    fi
+- name: "03 remove previous deployment"
+  become: true
+  file: 
+    path: ~/udapeople/ 
+    state: absent
 
-  - name: "04 deploy backend app"
-    become_user: ubuntu
-    unarchive:
-      src: ../../backend/app.tar.gz
-      dest: ~/udapeople/
-      owner: ubuntu
-      group: ubuntu
-      mode: 0755
+- name: "04 deploy backend app"
+  become_user: ubuntu
+  unarchive:
+    src: ../../backend/app.tar.gz
+    dest: ~/udapeople/
+    owner: ubuntu
+    group: ubuntu
+    mode: 0755
 
-  - name: "05 run backend app"
-    become_user: ubuntu
-    shell: |
-      cd ~/udapeople/
-      npm i    
-      pm2 start main.js --update-env
+- name: "05 run backend app"
+  become_user: ubuntu
+  shell: |
+    cd ~/udapeople/
+    npm i    
+    pm2 start main.js --update-env
