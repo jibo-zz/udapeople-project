@@ -82,7 +82,6 @@ jobs:
       - run:
           name: Build front-end
           command: |
-            # Your code here
             cd frontend
             npm i
             npm run build
@@ -262,13 +261,13 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Run migrations
           command: |
             cd backend
-            npm i
+            yarn install
             npm run migrations > /tmp/migration.log
       - run:
           name: Send migration results to memstash
