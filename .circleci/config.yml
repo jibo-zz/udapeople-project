@@ -14,6 +14,27 @@ commands:
             echo "export COMMIT_MESSAGE=\"$(git log --format=%B -n 1 $CIRCLE_SHA1)\"" >> $BASH_ENV
             source $BASH_ENV
 
+  slack-notification-fail:
+    description: Send notification to Slack
+    steps:
+      - extract-commit-message
+
+      - slack/notify:
+          channel: C01FC0ZPENR
+          event: fail
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                      "type": "mrkdwn",
+                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
+                  }
+                }
+              ]
+            }
+
   destroy-environment:
     description: Destroy backend and frontend cloudformation stacks given a workflow ID.
     steps:
@@ -27,8 +48,8 @@ commands:
           name: Destroy environments
           when: on_fail
           command: |
-            aws cloudformation delete-stack --stack-name udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
-            aws cloudformation delete-stack --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+            aws cloudformation delete-stack --stack-name backend-${CIRCLE_WORKFLOW_ID:0:7}
+            aws cloudformation delete-stack --stack-name frontend-${CIRCLE_WORKFLOW_ID:0:7}
             exit 0
 
   revert-migrations:
@@ -68,21 +89,8 @@ jobs:
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-build
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
+
+      - slack-notification-fail
 
   build-backend:
     docker:
@@ -100,22 +108,7 @@ jobs:
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
+      - slack-notification-fail
 
   test-frontend:
     docker:
@@ -179,44 +172,50 @@ jobs:
       - image: amazon/aws-cli
     steps:
       - checkout
+
       - run:
-          name: Install dependencies
-          command: yum -y install tar gzip jq git
+          name: Install prerequsites
+          command: |
+            yum -y install tar gzip jq git
       - run:
           name: Ensure backend infrastructure exists
           command: |
-             aws cloudformation deploy \
+            # build-backend:
+            aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
-              --tags project=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} \
-              --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --tags project=udapeople \
+              --stack-name "backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID=${CIRCLE_WORKFLOW_ID:0:7}
       - run:
-          name: Ensure frontend infrastructure exist
-          command: |
-            aws cloudformation deploy \
-              --template-file .circleci/files/frontend.yml \
-              --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
-      - run:
-          name: Add backend ip to ansible inventory & Save backend URL in memstash
+          name: Add backend ip to ansible inventory
           command: |
             BACKEND_IP=`aws ec2 describe-instances \
-              --filters "Name=tag:Name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --query "Reservations[*].Instances[*].[PublicDnsName]" \
               --output text | tr -d '\n'`
             echo $BACKEND_IP >> .circleci/ansible/inventory.txt
             cat .circleci/ansible/inventory.txt
             # put it in the shared memory
             curl -H "Content-Type: text/plain" \
-              -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" \
+              -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
               --request PUT \
               --data "$BACKEND_IP" https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}
       - persist_to_workspace:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
-      # Here's where you will add some code to rollback on failure
+
+      - run:
+          name: Ensure frontend infrastructure exist
+          command: |
+            # build-frontend:
+            aws cloudformation deploy \
+            --template-file .circleci/files/frontend.yml \
+            --tags project=udapeople \
+            --stack-name "frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
+            --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
+      
+      - slack-notification-fail
       - destroy-environment
 
   configure-infrastructure:
@@ -224,9 +223,11 @@ jobs:
       - image: willhallonline/ansible:2.10-ubuntu-18.04
     steps:
       - checkout
+
       - add_ssh_keys:
           fingerprints:
-            - "9f:aa:d6:13:fa:8d:1c:a9:98:79:56:08:92:ab:60:03"
+            - "12:ed:24:97:4a:cc:64:0a:0f:8d:c8:dd:ab:49:ca:4b"
+
       - run:
           name: Install dependencies
           command: |
@@ -244,111 +245,119 @@ jobs:
           command: |
             cd ~/project/.circleci/ansible
             ansible-playbook configure-server.yml --inventory-file=inventory.txt
-      # - run:
-      #     name: Install prometheus node exporter
-      #     command: |
-      #       cd ~/project/.circleci/ansible
-      #       ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
-      # Here's where you will add some code to rollback on failure
+            
+      - run:
+          name: Install prometheus node exporter
+          command: |
+            cd ~/project/.circleci/ansible
+            ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
+      - slack-notification-fail
       - destroy-environment
 
   run-migrations:
     docker:
-      - image: circleci/node:14.16.0
+      - image: amazon/aws-cli
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+
+      - restore_cache:
+          key: v1-backend-build
+
       - run:
-          name: Install AWS CLI dependencies
+          name: Install dependencies
           command: |
-            cd /tmp
-            sudo apt-get update && sudo apt-get install -yy less
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
+            curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+            yum -y install nodejs npm tar gzip jq git
       - run:
           name: Run migrations
           command: |
             cd backend
             npm i
-            npm run migrations > migration_status
+            npm run migrations > /tmp/migration.log
       - run:
           name: Send migration results to memstash
           command: |
-            cd backend
-            if grep -q "has been executed successfully" migration_status
+            MIGRATION_COUNT=`grep -c "has been executed successfully" /tmp/migration.log || true`
+            echo "migrations count: ${MIGRATION_COUNT}"
+            if [[ $MIGRATION_COUNT -gt 0 ]];
             then
-              echo "DB migration was successful, will update memstash..."
-              curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "success" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
-            else
-              echo "DB migration failed, please verify setup! Probably the database already exists. Verify setup!"
-              curl -H "Content-Type: text/plain" -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request PUT --data "failure" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
+              # put it in the shared memory
+              curl -H "Content-Type: text/plain" \
+               -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
+               --request PUT --data "1" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
             fi
-            echo "WorkflowID=${CIRCLE_WORKFLOW_ID:0:7}"
-      # Here's where you will add some code to rollback on failur
+      - slack-notification-fail
       - revert-migrations
-      - destroy-environment
+      - destroy-environment      
 
   deploy-frontend:
     docker:
-      - image: circleci/node:14.16.0
+      - image: amazon/aws-cli
     steps:
       - checkout
-      - attach_workspace:
-          at: .
       - run:
-          name: Install AWS CLI dependencies
+          name: Install dependencies
           command: |
-            cd /tmp
-            sudo apt-get update && sudo apt-get install -yy less
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            sudo ./aws/install
+            curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+            yum -y install nodejs npm tar gzip jq git
       - run:
           name: Get backend url
           command: |
-            export API_URL=$(curl -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request GET https://api.memstash.io/values/BACKEND_URL)
+            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
+            export API_URL="http://${BACKEND_IP}:3030"
             echo "${API_URL}"
       - run:
           name: Build frontend
-          command: |
+          command: |            
             cd frontend
             npm i
-            npm run build
+            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
+            export API_URL="http://${BACKEND_IP}:3030"
+            export NODE_ENV=production
+            #npm install webpack
+            #npm install webpack-cli
+            npm run build:prod
       - run:
           name: Deploy frontend objects
           command: |
             cd frontend
-            aws s3 cp ./dist "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
-      - persist_to_workspace:
-          root: .
-          paths:
-            - frontend/dist
-      # Here's where you will add some code to rollback on failure
+            #cp -r node_modules ./dist/
+            cp .env ./dist/
+            # deploy to s3 bucket
+            aws s3 cp ./dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      - run:
+          name: Create S3 bucket url
+          command: |
+            LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
+            S3_URL="udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
+            echo $S3_URL
+            curl -H "Content-Type: text/plain" -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
+            --request PUT --data "$S3_URL" \
+            https://api.memstash.io/values/S3_URL_${CIRCLE_WORKFLOW_ID:0:7}
+      - slack-notification-fail
       - revert-migrations
       - destroy-environment
-
+      
   deploy-backend:
     docker:
-      - image: python:3.9.0-alpine
+      - image: willhallonline/ansible:2.10-ubuntu-18.04
     steps:
       - checkout
+
       - add_ssh_keys:
           fingerprints:
-            - "9f:aa:d6:13:fa:8d:1c:a9:98:79:56:08:92:ab:60:03"
-      - attach_workspace:
-          at: .
+            - "12:ed:24:97:4a:cc:64:0a:0f:8d:c8:dd:ab:49:ca:4b"
+
       - run:
           name: Install dependencies
           command: |
-            cd /tmp
-            apk add --update ansible curl rsync openssh nodejs npm
-            ansible --version
-            pip install awscli
-            aws --version
+            apt -y update
+            apt -y install jq tar gzip git curl
+            curl -sL https://deb.nodesource.com/setup_12.x | bash -
+            apt -y install nodejs
       - attach_workspace:
           at: ~/
+
       - run:
           name: Avoid hosts unknown
           command: |
@@ -358,6 +367,7 @@ jobs:
           command: |
             cd backend
             npm i
+            #export NODE_ENV=production
             npm run build
             cp package* ./dist
             cd dist
@@ -367,50 +377,34 @@ jobs:
           command: |
             cd ~/project/.circleci/ansible
             ansible-playbook deploy-backend.yml --inventory-file=inventory.txt
-      # Here's where you will add some code to rollback on failure
+      - slack-notification-fail
       - revert-migrations
       - destroy-environment
 
   smoke-test:
     docker:
-      - image: python:3.9.0-alpine
+      - image: amazon/aws-cli
+
     steps:
-      - checkout
-      - attach_workspace:
-          at: .
       - run:
           name: Install dependencies
           command: |
-            cd /tmp
-            apk add --update curl nodejs npm
-            pip install awscli
+            yum -y install jq tar gzip git curl
       - run:
-          name: Backend smoke test.
+          name: Backend smoke test
           command: |
-            export BACKEND_URL=$(curl -H "token: 9d0422cb-ac3d-4680-92eb-d73a588e179a" --request GET https://api.memstash.io/values/BACKEND_URL)
-            curl "$BACKEND_URL/api/status"
+            BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
+            echo $BACKEND_IP
+            curl -s http://${BACKEND_IP}:3030/api/status | grep "\"status\":\"ok\""
       - run:
-          name: Frontend smoke test.
+          name: Frontend smoke test
           command: |
-            URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.eu-central-1.amazonaws.com/index.html"
-            curl -s ${URL} | grep -q "Welcome"
-      # Here's where you will add some code to rollback on failure
-      - extract-commit-message
-      - slack/notify:
-          channel: C01Q5AANY69
-          event: fail
-          custom: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                      "type": "mrkdwn",
-                      "text": "Your job *$CIRCLE_JOB* has *faild* :octagonal_sign: (<$CIRCLE_BUILD_URL|build #$CIRCLE_BUILD_NUM>)\n\nrepo: $CIRCLE_REPOSITORY_URL\n\nbranch: $CIRCLE_BRANCH\n\ncommitter: $CIRCLE_USERNAME\n\ncommit message: $COMMIT_MESSAGE"
-                  }
-                }
-              ]
-            }
+            LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
+            S3_URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
+            echo $S3_URL
+            curl -s ${S3_URL} | grep "Welcome"
+            
+      - slack-notification-fail
       - revert-migrations
       - destroy-environment
 
