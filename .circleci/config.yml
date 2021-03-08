@@ -246,11 +246,11 @@ jobs:
             cd ~/project/.circleci/ansible
             ansible-playbook configure-server.yml --inventory-file=inventory.txt
             
-      - run:
-          name: Install prometheus node exporter
-          command: |
-            cd ~/project/.circleci/ansible
-            ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
+      # - run:
+      #     name: Install prometheus node exporter
+      #     command: |
+      #       cd ~/project/.circleci/ansible
+      #       ansible-playbook configure-prometheus.yml --inventory-file=inventory.txt
       - slack-notification-fail
       - destroy-environment
 
