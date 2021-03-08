@@ -261,7 +261,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_13.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Run migrations
@@ -293,13 +293,13 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_13.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Get backend url
           command: |
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3000"
+            export API_URL="http://${BACKEND_IP}:3030"
             echo "${API_URL}"
       - run:
           name: Build frontend
@@ -307,7 +307,7 @@ jobs:
             cd frontend
             npm i
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3000"
+            export API_URL="http://${BACKEND_IP}:3030"
             export NODE_ENV=production
             #npm install webpack
             #npm install webpack-cli
@@ -346,7 +346,7 @@ jobs:
           command: |
             apt -y update
             apt -y install jq tar gzip git curl
-            curl -sL https://deb.nodesource.com/setup_14.x | bash -
+            curl -sL https://deb.nodesource.com/setup_13.x | bash -
             apt -y install nodejs
       - attach_workspace:
           at: ~/
@@ -388,18 +388,28 @@ jobs:
           command: |
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
             echo $BACKEND_IP
-            curl -s http://${BACKEND_IP}:3000/api/status | grep "\"status\":\"ok\""
+            if curl -s "http://${BACKEND_IP}:3030/api/status" | grep "ok"
+            then
+              return 0
+            else
+              return 1
+            fi
       - run:
           name: Frontend smoke test
           command: |
             LOCATION=`aws s3api get-bucket-location --bucket udapeople-${CIRCLE_WORKFLOW_ID:0:7} --output text | tr -d '\n'`
             S3_URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-${LOCATION}.amazonaws.com/index.html"
             echo $S3_URL
-            curl -s ${S3_URL} | grep "Welcome"
+            if curl -s ${S3_URL} | grep "Welcome"
+            then
+              return 0
+            else
+              return 1
+            fi
             
-      # - slack-notification-fail
-      # - revert-migrations
-      # - destroy-environment
+      - slack-notification-fail
+      - revert-migrations
+      - destroy-environment
 
 
   # cloudfront-update:
