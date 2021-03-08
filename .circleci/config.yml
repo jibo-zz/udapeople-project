@@ -261,7 +261,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_13.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Run migrations
@@ -293,7 +293,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_13.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Get backend url
@@ -346,7 +346,7 @@ jobs:
           command: |
             apt -y update
             apt -y install jq tar gzip git curl
-            curl -sL https://deb.nodesource.com/setup_13.x | bash -
+            curl -sL https://deb.nodesource.com/setup_14.x | bash -
             apt -y install nodejs
       - attach_workspace:
           at: ~/
