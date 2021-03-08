@@ -259,10 +259,6 @@ jobs:
       - image: amazon/aws-cli
     steps:
       - checkout
-
-      - restore_cache:
-          key: v1-backend-build
-
       - run:
           name: Install dependencies
           command: |
