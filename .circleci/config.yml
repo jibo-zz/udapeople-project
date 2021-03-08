@@ -293,7 +293,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+            curl -sL https://rpm.nodesource.com/setup_14.x | bash -
             yum -y install nodejs npm tar gzip jq git
       - run:
           name: Get backend url
@@ -305,7 +305,7 @@ jobs:
           name: Build frontend
           command: |            
             cd frontend
-            npm i
+            yarn install
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
             export API_URL="http://${BACKEND_IP}:3030"
             export NODE_ENV=production
@@ -348,7 +348,7 @@ jobs:
           command: |
             apt -y update
             apt -y install jq tar gzip git curl
-            curl -sL https://deb.nodesource.com/setup_12.x | bash -
+            curl -sL https://deb.nodesource.com/setup_14.x | bash -
             apt -y install nodejs
       - attach_workspace:
           at: ~/
@@ -361,7 +361,7 @@ jobs:
           name: Build backend
           command: |
             cd backend
-            npm i
+            yarn install
             #export NODE_ENV=production
             npm run build
             cp package* ./dist
