@@ -390,9 +390,9 @@ jobs:
             echo $BACKEND_IP
             if curl -s "http://${BACKEND_IP}:3030/api/status" | grep "ok"
             then
-              return 0
+              exit 0
             else
-              return 1
+              exit 1
             fi
       - run:
           name: Frontend smoke test
@@ -402,9 +402,9 @@ jobs:
             echo $S3_URL
             if curl -s ${S3_URL} | grep "Welcome"
             then
-              return 0
+              exit 0
             else
-              return 1
+              exit 1
             fi
             
       - slack-notification-fail
