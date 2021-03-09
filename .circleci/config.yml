@@ -299,7 +299,7 @@ jobs:
           name: Get backend url
           command: |
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3000"
+            export API_URL="http://${BACKEND_IP}"
             echo "${API_URL}"
       - run:
           name: Build frontend
@@ -307,7 +307,7 @@ jobs:
             cd frontend
             npm i
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
-            export API_URL="http://${BACKEND_IP}:3000"
+            export API_URL="http://${BACKEND_IP}"
             export NODE_ENV=production
             #npm install webpack
             #npm install webpack-cli
@@ -388,7 +388,7 @@ jobs:
           command: |
             BACKEND_IP=`curl -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request GET https://api.memstash.io/values/BACKEND_IP_${CIRCLE_WORKFLOW_ID:0:7}`
             echo $BACKEND_IP
-            if curl -s "http://${BACKEND_IP}:3000/api/status" | grep "ok"
+            if curl -s "http://${BACKEND_IP}/api/status" | grep "ok"
             then
               exit 0
             else
