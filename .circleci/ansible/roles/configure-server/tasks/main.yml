@@ -23,6 +23,13 @@
   shell: grep -c "^export TYPEORM_CONNECTION" /etc/environment || true
   register: test_grep
 
+- name: Allow all access to tcp port 3030
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '3030'
+    proto: tcp
+
 - name: "06 set environment variables"
   become: true
   shell: |
