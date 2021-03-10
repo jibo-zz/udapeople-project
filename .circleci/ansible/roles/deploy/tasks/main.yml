@@ -33,6 +33,7 @@
     pm2 start main.js --update-env -- --port 3030
 
 - name: Allow all access to tcp port 3030
+  become_user: root
   community.general.ufw:
     rule: allow
     port: '3030'
