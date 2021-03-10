@@ -407,9 +407,9 @@ jobs:
               exit 1
             fi
             
-      - slack-notification-fail
-      - revert-migrations
-      - destroy-environment
+      # - slack-notification-fail
+      # - revert-migrations
+      # - destroy-environment
 
 
   # cloudfront-update:
