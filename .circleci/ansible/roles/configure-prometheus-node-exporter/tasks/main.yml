@@ -17,6 +17,13 @@
   copy:
     src: node_exporter.service
     dest: /etc/systemd/system/
+  
+- name: Allow all access to tcp port 9000
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: '9000'
+    proto: tcp
 
 - name: "enable node_exporter service"
   become: true

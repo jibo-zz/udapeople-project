@@ -1,2 +1,5 @@
 [URL01] https://github.com/jibo-zz/udapeople-project
-[URL02] http://udapeople-4272f2f.s3-website-us-east-1.amazonaws.com
+[URL02] http://udapeople-1bce55e.s3-website-us-east-1.amazonaws.com/
+[URL03] d249oay1cu178k.cloudfront.net
+[URL04] ec2-3-83-1-12.compute-1.amazonaws.com:3030/api/status
+[URL05]
