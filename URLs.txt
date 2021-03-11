@@ -1,1 +1,2 @@
 [URL01] https://github.com/jibo-zz/udapeople-project
+[URL02] http://udapeople-4272f2f.s3-website-us-east-1.amazonaws.com
