@@ -1,5 +1,5 @@
 [URL01] https://github.com/jibo-zz/udapeople-project
-[URL02] http://udapeople-4a37aef.s3-website-us-east-1.amazonaws.com/
-[URL03] d15nnlte6or69c.cloudfront.net
-[URL04] ec2-54-237-30-142.compute-1.amazonaws.com:3030/api/status
-[URL05] http://ec2-3-95-180-35.compute-1.amazonaws.com:9090/graph
+[URL02] http://udapeople-de5b0a7.s3-website-us-east-1.amazonaws.com/
+[URL03] dgyanq7gfuvoy.cloudfront.net
+[URL04] ec2-18-234-104-150.compute-1.amazonaws.com:3030/api/status
+[URL05] http://ec2-54-234-192-126.compute-1.amazonaws.com:9090/graph
