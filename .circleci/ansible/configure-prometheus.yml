@@ -6,4 +6,4 @@
 
   roles:
     - configure-prometheus-node-exporter
-    - configure-prometheus-alertmanager
+    # - configure-prometheus-alertmanager
