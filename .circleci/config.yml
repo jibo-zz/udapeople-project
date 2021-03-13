@@ -270,20 +270,20 @@ jobs:
           name: Run migrations
           command: |
             cd backend
-            npm i
             npm run migrations > /tmp/migration.log
+            cat /tmp/migration.log
       - run:
           name: Send migration results to memstash
           command: |
-            MIGRATION_COUNT=`grep -c "has been executed successfully" /tmp/migration.log || true`
-            echo "migrations count: ${MIGRATION_COUNT}"
-            if [[ $MIGRATION_COUNT -gt 0 ]];
+            if grep -q "has been executed successfully" /tmp/migration.log
             then
-              # put it in the shared memory
-              curl -H "Content-Type: text/plain" \
-               -H "token: e38aee29-a976-4696-843d-2d115c52219a" \
-               --request PUT --data "1" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
+              echo "DB migration was successful, will update memstash..."
+              curl -H "Content-Type: text/plain" -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request PUT --data "success" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
+            else
+              echo "DB migration failed, please verify setup! Probably the database already exists. Verify setup!"
+              curl -H "Content-Type: text/plain" -H "token: e38aee29-a976-4696-843d-2d115c52219a" --request PUT --data "failure" https://api.memstash.io/values/migration_${CIRCLE_WORKFLOW_ID:0:7}
             fi
+            echo "WorkflowID=${CIRCLE_WORKFLOW_ID:0:7}"
       - slack-notification-fail
       - revert-migrations
       - destroy-environment      
